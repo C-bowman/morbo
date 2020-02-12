@@ -1,83 +1,83 @@
 
-from numpy import array, zeros, linspace, concatenate
-from mesh_tools.vessel_boundaries import tcv_baffled_boundary
+from numpy import array, zeros, linspace, concatenate, searchsorted
+# from mesh_tools.vessel_boundaries import tcv_baffled_boundary
 
 import matplotlib.pyplot as plt
 
 
 class Grid(object):
-    def __init__(self):
-        pass
+    def __init__(self, flux_axis = None, parallel_axis = None):
+        self.psi = flux_axis
+        self.distance = parallel_axis
+        self.R = zeros([len(parallel_axis), len(flux_axis)])
+        self.z = zeros([len(parallel_axis), len(flux_axis)])
+        self.lcfs_drn = zeros(2)
+        self.lcfs_index = searchsorted(flux_axis, 1.0, side = 'left')
+        self.trace_drn = 1
 
 class GridGenerator(object):
     def __init__(self, equilibrium = None, core_flux_grid = None, pfr_flux_grid = None,
                  outer_sol_flux_grid = None, inner_sol_flux_grid = None):
 
-        self.psi = equilibrium
+        self.eq = equilibrium
         psi_axis_lcfs_inds = [len(pfr_flux_grid), len(core_flux_grid), len(pfr_flux_grid), len(core_flux_grid)]
 
         """
         now use these to build the flux axes for the legs / edges
         """
-        ol_psi_axis = []
-        ol_psi_axis.extend(pfr_flux_grid)
-        ol_psi_axis.append(1.)
-        ol_psi_axis.extend(outer_sol_flux_grid)
+        outer_leg_psi_axis = []
+        outer_leg_psi_axis.extend(pfr_flux_grid)
+        outer_leg_psi_axis.append(1.)
+        outer_leg_psi_axis.extend(outer_sol_flux_grid)
 
-        oe_psi_axis = []
-        oe_psi_axis.extend(core_flux_grid)
-        oe_psi_axis.append(1.)
-        oe_psi_axis.extend(outer_sol_flux_grid)
+        outer_edge_psi_axis = []
+        outer_edge_psi_axis.extend(core_flux_grid)
+        outer_edge_psi_axis.append(1.)
+        outer_edge_psi_axis.extend(outer_sol_flux_grid)
 
-        ie_psi_axis = []
-        ie_psi_axis.extend(core_flux_grid)
-        ie_psi_axis.append(1.)
-        ie_psi_axis.extend(inner_sol_flux_grid)
+        inner_edge_psi_axis = []
+        inner_edge_psi_axis.extend(core_flux_grid)
+        inner_edge_psi_axis.append(1.)
+        inner_edge_psi_axis.extend(inner_sol_flux_grid)
 
-        il_psi_axis = []
-        il_psi_axis.extend(pfr_flux_grid)
-        il_psi_axis.append(1.)
-        il_psi_axis.extend(inner_sol_flux_grid)
-
-        psi_axes = [il_psi_axis, ie_psi_axis, ol_psi_axis, oe_psi_axis]
+        inner_leg_psi_axis = []
+        inner_leg_psi_axis.extend(pfr_flux_grid)
+        inner_leg_psi_axis.append(1.)
+        inner_leg_psi_axis.extend(inner_sol_flux_grid)
 
 
         """
         specify the poloidal distance grids
         """
-        ol_distance_axis = concatenate([linspace(0,0.9,16), linspace(0.9,1,6)[1:]])
-        il_distance_axis = concatenate([linspace(0,0.65,5), linspace(0.65,1,6)[1:]])
+        outer_leg_distance_axis = concatenate([linspace(0,0.9,16), linspace(0.9,1,6)[1:]])
+        inner_leg_distance_axis = concatenate([linspace(0,0.65,5), linspace(0.65,1,6)[1:]])
 
-        oe_distance_axis = linspace(0,1,12)
-        ie_distance_axis = linspace(0,1,12)
-
-        distance_axes = [il_distance_axis, ie_distance_axis, ol_distance_axis, oe_distance_axis]
+        outer_edge_distance_axis = linspace(0,1,12)
+        inner_edge_distance_axis = linspace(0,1,12)
 
 
-        """
-        build the R/z grids for the legs / edges
-        """
-        R_ol = zeros([len(ol_distance_axis), len(ol_psi_axis)])
-        z_ol = zeros([len(ol_distance_axis), len(ol_psi_axis)])
-
-        R_oe = zeros([len(oe_distance_axis), len(oe_psi_axis)])
-        z_oe = zeros([len(oe_distance_axis), len(oe_psi_axis)])
-
-        R_il = zeros([len(il_distance_axis), len(il_psi_axis)])
-        z_il = zeros([len(il_distance_axis), len(il_psi_axis)])
-
-        R_ie = zeros([len(ie_distance_axis), len(ie_psi_axis)])
-        z_ie = zeros([len(ie_distance_axis), len(ie_psi_axis)])
-
-        R_grids = [R_il, R_ie, R_ol, R_oe]
-        z_grids = [z_il, z_ie, z_ol, z_oe]
+        inner_leg = Grid(flux_axis = inner_leg_psi_axis, parallel_axis = inner_leg_distance_axis)
+        outer_leg = Grid(flux_axis = outer_leg_psi_axis, parallel_axis = outer_leg_distance_axis)
+        inner_edge = Grid(flux_axis = inner_edge_psi_axis, parallel_axis = inner_edge_distance_axis)
+        outer_edge = Grid(flux_axis = outer_edge_psi_axis, parallel_axis = outer_edge_distance_axis)
 
 
         """
         Find the 4 directions pointing along the separatrix from the x-point
         """
-        lcfs_directions = self.psi.lcfs_directions()
+        lcfs_directions = self.eq.lcfs_directions()
         il_drn, ie_drn, ol_drn, oe_drn = lcfs_directions
+        inner_leg.lcfs_drn = il_drn
+        outer_leg.lcfs_drn = ol_drn
+        inner_edge.lcfs_drn = ie_drn
+        outer_edge.lcfs_drn = oe_drn
+
+        inner_leg.trace_drn = -1
+        outer_leg.trace_drn = 1
+        inner_edge.trace_drn = 1
+        outer_edge.trace_drn = -1
+
+        grids = [inner_leg, outer_leg, inner_edge, outer_edge]
 
 
         """
@@ -85,76 +85,51 @@ class GridGenerator(object):
         """
         # create starting points for tracing the grid boundaries
         gap = 0.01
-        for R,z,drn,psi_ax in zip(R_grids, z_grids, lcfs_directions, psi_axes):
-            start = psi.follow_gradient(xpt + gap*drn, target_psi=1.)
+        for g in grids:
+            start = self.eq.follow_gradient(self.eq.x_point + gap*g.lcfs_drn, target_psi=1.)
             # trace outer-leg boundary
-            for i,p in enumerate(psi_ax):
-                x = psi.follow_gradient(start, target_psi = p)
-                R[0,i] = x[0]
-                z[0,i] = x[1]
-
+            for i,p in enumerate(g.psi):
+                x = self.eq.follow_gradient(start, target_psi = p)
+                g.R[0,i] = x[0]
+                g.z[0,i] = x[1]
 
 
         """
         match grids at x-point
         """
-        for R,z,m in zip(R_grids, z_grids, psi_axis_lcfs_inds):
-            R[0,m] = xpt[0]
-            z[0,m] = xpt[1]
+        for g in grids:
+            g.R[0,g.lcfs_index] = self.eq.x_point[0]
+            g.z[0,g.lcfs_index] = self.eq.x_point[1]
 
 
 
         """
-        match the outer-leg / outer-edge boundary
+        match the leg-edge boundaries
         """
-        outer_sol_boundary_R = 0.5*(R_ol[0,len(pfr_flux_grid):] + R_oe[0,len(core_flux_grid):])
-        R_ol[0,len(pfr_flux_grid):] = outer_sol_boundary_R
-        R_oe[0,len(core_flux_grid):] = outer_sol_boundary_R
+        for G1, G2 in [(outer_leg, outer_edge), (inner_leg, inner_edge)]:
+            boundary_R = 0.5*(G1.R[0,G1.lcfs_index:] + G2.R[0,G2.lcfs_index:])
+            G1.R[0, G1.lcfs_index:] = boundary_R
+            G2.R[0, G2.lcfs_index:] = boundary_R
 
-        outer_sol_boundary_z = 0.5*(z_ol[0,len(pfr_flux_grid):] + z_oe[0,len(core_flux_grid):])
-        z_ol[0,len(pfr_flux_grid):] = outer_sol_boundary_z
-        z_oe[0,len(core_flux_grid):] = outer_sol_boundary_z
-
-
-
-        """
-        match the inner-leg / inner-edge boundary
-        """
-        inner_sol_boundary_R = 0.5*(R_il[0,len(pfr_flux_grid):]+R_ie[0,len(core_flux_grid):])
-        R_il[0,len(pfr_flux_grid):] = inner_sol_boundary_R
-        R_ie[0,len(core_flux_grid):] = inner_sol_boundary_R
-
-        inner_sol_boundary_z = 0.5*(z_il[0,len(pfr_flux_grid):]+z_ie[0,len(core_flux_grid):])
-        z_il[0,len(pfr_flux_grid):] = inner_sol_boundary_z
-        z_ie[0,len(core_flux_grid):] = inner_sol_boundary_z
+            boundary_z = 0.5*(G1.z[0,G1.lcfs_index:] + G2.z[0,G2.lcfs_index:])
+            G1.z[0, G1.lcfs_index:] = boundary_z
+            G2.z[0, G2.lcfs_index:] = boundary_z
 
 
 
         """
-        match the inner-leg / outer-leg boundary
+        match the leg-leg and edge-edge boundaries
         """
-        pfr_boundary_R = 0.5*(R_il[0,:len(pfr_flux_grid)]+R_ol[0,:len(pfr_flux_grid)])
-        R_il[0,:len(pfr_flux_grid)] = pfr_boundary_R
-        R_ol[0,:len(pfr_flux_grid)] = pfr_boundary_R
+        for G1, G2 in [(inner_leg, outer_leg), (inner_edge, inner_edge)]:
+            boundary_R = 0.5*(G1.R[0,:G1.lcfs_index] + G2.R[0,:G2.lcfs_index])
+            G1.R[0, :G1.lcfs_index] = boundary_R
+            G2.R[0, :G2.lcfs_index] = boundary_R
 
-        pfr_boundary_z = 0.5*(z_il[0,:len(pfr_flux_grid)]+z_ol[0,:len(pfr_flux_grid)])
-        z_il[0,:len(pfr_flux_grid)] = pfr_boundary_z
-        z_ol[0,:len(pfr_flux_grid)] = pfr_boundary_z
+            boundary_z = 0.5*(G1.z[0,:G1.lcfs_index] + G2.z[0,:G2.lcfs_index])
+            G1.z[0, :G1.lcfs_index] = boundary_z
+            G2.z[0, :G2.lcfs_index] = boundary_z
 
-
-
-        """
-        match the inner-edge / outer-edge boundary
-        """
-        core_boundary_R = 0.5*(R_ie[0,:len(core_flux_grid)]+R_oe[0,:len(core_flux_grid)])
-        R_ie[0,:len(core_flux_grid)] = core_boundary_R
-        R_oe[0,:len(core_flux_grid)] = core_boundary_R
-
-        core_boundary_z = 0.5*(z_ie[0,:len(core_flux_grid)]+z_oe[0,:len(core_flux_grid)])
-        z_ie[0,:len(core_flux_grid)] = core_boundary_z
-        z_oe[0,:len(core_flux_grid)] = core_boundary_z
-
-
+        exit()
 
         from mesh_tools.mesh import Polygon
         bound_poly = Polygon(*tcv_baffled_boundary())

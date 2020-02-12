@@ -131,6 +131,9 @@ class Equilibrium(object):
         return x0, travelled
 
     def find_stationary_points(self, R_points = 3, z_points = 25):
+        """
+        Find all points inside the flux grid where the magnitude of the gradient is zero
+        """
         # create a grid of locations to run root finding from
         z_starts = linspace(self.z_min, self.z_max, z_points+2)[1:-1]
         R_starts = linspace(self.R_min, self.R_max, R_points+2)[1:-1]
@@ -173,6 +176,9 @@ class Equilibrium(object):
         self.psi_spline = RectBivariateSpline(self.R, self.z, self.psi_grid)
 
     def lcfs_directions(self):
+        """
+        Find the 4 unit vectors which point along the direction of the separatrix at the x-point
+        """
         # brute-force grid-search to find a direction pointing along the LCFS
         theta = linspace(0, 2*pi, 4*360)
         r = 0.01
