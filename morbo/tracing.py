@@ -128,6 +128,7 @@ class Equilibrium(object):
                 step_size *= 0.5
             # break the loop once the step size is small enough to ensure good accuracy
             if step_size < 1e-6: break
+
         return x0, travelled
 
     def find_stationary_points(self, R_points = 3, z_points = 25):
