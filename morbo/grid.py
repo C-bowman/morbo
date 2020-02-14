@@ -176,10 +176,10 @@ class GridGenerator(object):
                                  self.inner_edge_ortho_grid, self.outer_edge_ortho_grid]
 
         for G in self.distance_grids:
-            self.trace_distance_grid(G, step_size = 1e-2)
+            self.trace_distance_grid(G, step_size = 5e-3)
 
         for G in self.orthogonal_grids:
-            self.trace_orthogonal_grid(G, step_size = 1e-2)
+            self.trace_orthogonal_grid(G, step_size = 5e-3)
 
 
     def plot_grids(self):
@@ -202,6 +202,8 @@ class GridGenerator(object):
 
 
     def trace_distance_grid(self, G, step_size = 1e-3):
+        eps = 1e-3
+        # First find the total poloidal distance to the endpoint along each flux surface
         total_poloidal_distance = zeros(len(G.psi))
         for i in range(len(G.psi)):
             if i != G.lcfs_index:
@@ -209,26 +211,27 @@ class GridGenerator(object):
                 x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
                 total_poloidal_distance[i] = distance
             else:
-                v = array([G.R[0,i] + 0.001*G.lcfs_drn[0], G.z[0,i] + 0.001*G.lcfs_drn[1]])
+                v = array([G.R[0,i] + eps*G.lcfs_drn[0], G.z[0,i] + eps*G.lcfs_drn[1]])
                 x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
-                total_poloidal_distance[i] = distance + 0.001
+                total_poloidal_distance[i] = distance + eps
 
             G.R[-1,i] = x0[0]
             G.z[-1,i] = x0[1]
 
+        # now trace out point along each flux surface
         for j in range(len(G.psi)):
-            gaps = G.distance * total_poloidal_distance[j]
-            for i,d in enumerate(gaps[1:-1]):
-                if j != G.lcfs_index and i != 0:
-                    v = array([G.R[0,j], G.z[0,j]])
-                    x0 = self.eq.follow_surface(v, d, direction=G.trace_drn, step_size = step_size)
-                else:
-                    v = array([G.R[0,j] + 0.001*G.lcfs_drn[0], G.z[0,j] + 0.001*G.lcfs_drn[1]])
-                    x0 = self.eq.follow_surface(v, d, direction=G.trace_drn, step_size = step_size)
+            gaps = diff(G.distance * total_poloidal_distance[j])
 
+            v = array([G.R[0,j] + eps*G.lcfs_drn[0], G.z[0,j] + eps*G.lcfs_drn[1]])
+            x0 = self.eq.follow_surface(v, gaps[0]-eps, direction = G.trace_drn, step_size = step_size)
+            G.R[1,j] = x0[0]
+            G.z[1,j] = x0[1]
+
+            for i in range(1,len(G.distance)-2):
+                v = array([G.R[i,j], G.z[i,j]])
+                x0 = self.eq.follow_surface(v, gaps[i], direction=G.trace_drn, step_size = step_size)
                 G.R[i+1,j] = x0[0]
                 G.z[i+1,j] = x0[1]
-
 
     def trace_orthogonal_grid(self, G, step_size = 1e-3):
         """
