@@ -1,8 +1,29 @@
 
-from numpy import array, zeros, linspace, concatenate, searchsorted
+from numpy import array, zeros, concatenate, searchsorted, ndarray, ones, exp
+from scipy.special import factorial
+from numpy.linalg import solve
 from mesh_tools.vessel_boundaries import tcv_baffled_boundary
 from copy import deepcopy
 import matplotlib.pyplot as plt
+
+def cross_fade(x, sigma = 0.05, k = 2.):
+    z = abs((x-1)/sigma)
+    return exp(-0.5*z**k)
+
+
+def get_fd_coeffs(points, order=1):
+    # check validity of inputs
+    if type(points) is not ndarray: points = array(points)
+    n = len(points)
+    if n <= order: raise ValueError('The order of the derivative must be less than the number of points')
+    # build the linear system
+    b = zeros(n)
+    b[order] = factorial(order)
+    A = ones([n,n])
+    for i in range(1,n):
+        A[i,:] = points**i
+    # return the solution
+    return solve(A,b)
 
 
 class Grid(object):
@@ -24,8 +45,9 @@ class Grid(object):
 
 
 class GridGenerator(object):
-    def __init__(self, equilibrium = None, core_flux_grid = None, pfr_flux_grid = None,
-                 outer_sol_flux_grid = None, inner_sol_flux_grid = None):
+    def __init__(self, equilibrium = None, core_flux_grid = None, pfr_flux_grid = None, outer_sol_flux_grid = None,
+                 inner_sol_flux_grid = None, inner_leg_distance_axis = None, outer_leg_distance_axis = None,
+                 inner_edge_distance_axis = None, outer_edge_distance_axis = None):
 
         self.eq = equilibrium
         """
@@ -53,15 +75,8 @@ class GridGenerator(object):
 
 
         """
-        specify the poloidal distance grids
+        Build base grid objects
         """
-        outer_leg_distance_axis = concatenate([linspace(0,0.9,16), linspace(0.9,1,6)[1:]])
-        inner_leg_distance_axis = concatenate([linspace(0,0.65,5), linspace(0.65,1,6)[1:]])
-
-        outer_edge_distance_axis = linspace(0,1,30)
-        inner_edge_distance_axis = linspace(0,1,30)
-
-
         inner_leg = Grid(flux_axis = inner_leg_psi_axis, parallel_axis = inner_leg_distance_axis)
         outer_leg = Grid(flux_axis = outer_leg_psi_axis, parallel_axis = outer_leg_distance_axis)
         inner_edge = Grid(flux_axis = inner_edge_psi_axis, parallel_axis = inner_edge_distance_axis)
@@ -108,7 +123,6 @@ class GridGenerator(object):
             g.z[0,g.lcfs_index] = self.eq.x_point[1]
 
 
-
         """
         match the leg-edge boundaries
         """
@@ -144,47 +158,59 @@ class GridGenerator(object):
         inner_edge.condition = lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]>=0.))
         outer_edge.condition = lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]<=0.))
 
-        inner_leg_orth = deepcopy(inner_leg)
-        outer_leg_orth = deepcopy(outer_leg)
-        inner_edge_orth = deepcopy(inner_edge)
-        outer_edge_orth = deepcopy(outer_edge)
-        orth_grids = [inner_leg_orth, outer_leg_orth, inner_edge_orth, outer_edge_orth]
-
-        for G in grids:
-            self.trace_distance_grid(G)
-
-        for G in orth_grids:
-            self.trace_orthogonal_grid(G)
 
 
-        inner_leg.plot(color = 'red')
-        outer_leg.plot(color = 'blue')
-        inner_edge.plot(color = 'green')
-        outer_edge.plot(color = 'violet')
-        plt.plot(*tcv_baffled_boundary(), c = 'black')
-        plt.axis('equal')
+        self.inner_leg_dist_grid = deepcopy(inner_leg)
+        self.outer_leg_dist_grid = deepcopy(outer_leg)
+        self.inner_edge_dist_grid = deepcopy(inner_edge)
+        self.outer_edge_dist_grid = deepcopy(outer_edge)
+
+        self.inner_leg_ortho_grid = deepcopy(inner_leg)
+        self.outer_leg_ortho_grid = deepcopy(outer_leg)
+        self.inner_edge_ortho_grid = deepcopy(inner_edge)
+        self.outer_edge_ortho_grid = deepcopy(outer_edge)
+
+        self.distance_grids = [self.inner_leg_dist_grid, self.outer_leg_dist_grid,
+                               self.inner_edge_dist_grid, self.outer_edge_dist_grid]
+        self.orthogonal_grids = [self.inner_leg_ortho_grid, self.outer_leg_ortho_grid,
+                                 self.inner_edge_ortho_grid, self.outer_edge_ortho_grid]
+
+        for G in self.distance_grids:
+            self.trace_distance_grid(G, step_size = 1e-2)
+
+        for G in self.orthogonal_grids:
+            self.trace_orthogonal_grid(G, step_size = 1e-2)
+
+
+    def plot_grids(self):
+        cols = ['red', 'blue', 'green', 'violet']
+
+        fig = plt.figure()
+        ax1 = fig.add_subplot(131)
+        for G,c in zip(self.distance_grids, cols):
+            G.plot(color = c, ax = ax1)
+        ax1.plot(*tcv_baffled_boundary(), c = 'black')
+        ax1.axis('equal')
+
+        ax2 = fig.add_subplot(132)
+        for G,c in zip(self.orthogonal_grids, cols):
+            G.plot(color = c, ax = ax2)
+        ax2.plot(*tcv_baffled_boundary(), c = 'black')
+        ax2.axis('equal')
+
         plt.show()
 
-        inner_leg_orth.plot(color = 'red')
-        outer_leg_orth.plot(color = 'blue')
-        inner_edge_orth.plot(color = 'green')
-        outer_edge_orth.plot(color = 'violet')
-        plt.plot(*tcv_baffled_boundary(), c = 'black')
-        plt.axis('equal')
-        plt.show()
 
-
-
-    def trace_distance_grid(self, G):
+    def trace_distance_grid(self, G, step_size = 1e-3):
         total_poloidal_distance = zeros(len(G.psi))
         for i in range(len(G.psi)):
             if i != G.lcfs_index:
                 v = array([G.R[0,i], G.z[0,i]])
-                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn)
+                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
                 total_poloidal_distance[i] = distance
             else:
                 v = array([G.R[0,i] + 0.001*G.lcfs_drn[0], G.z[0,i] + 0.001*G.lcfs_drn[1]])
-                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn)
+                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
                 total_poloidal_distance[i] = distance + 0.001
 
             G.R[-1,i] = x0[0]
@@ -195,16 +221,16 @@ class GridGenerator(object):
             for i,d in enumerate(gaps[1:-1]):
                 if j != G.lcfs_index and i != 0:
                     v = array([G.R[0,j], G.z[0,j]])
-                    x0 = self.eq.follow_surface(v, d, direction=G.trace_drn)
+                    x0 = self.eq.follow_surface(v, d, direction=G.trace_drn, step_size = step_size)
                 else:
                     v = array([G.R[0,j] + 0.001*G.lcfs_drn[0], G.z[0,j] + 0.001*G.lcfs_drn[1]])
-                    x0 = self.eq.follow_surface(v, d, direction=G.trace_drn)
+                    x0 = self.eq.follow_surface(v, d, direction=G.trace_drn, step_size = step_size)
 
                 G.R[i+1,j] = x0[0]
                 G.z[i+1,j] = x0[1]
 
 
-    def trace_orthogonal_grid(self, G):
+    def trace_orthogonal_grid(self, G, step_size = 1e-3):
         """
         trace the grids using grad-psi
         """
@@ -212,11 +238,11 @@ class GridGenerator(object):
         for i in range(len(G.psi)):
             if i != G.lcfs_index:
                 v = array([G.R[0,i], G.z[0,i]])
-                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn)
+                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
                 total_poloidal_distance[i] = distance
             else:
                 v = array([G.R[0,i] + 0.001*G.lcfs_drn[0], G.z[0,i] + 0.001*G.lcfs_drn[1]])
-                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn)
+                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
                 total_poloidal_distance[i] = distance + 0.001
 
             G.R[-1,i] = x0[0]
@@ -226,7 +252,7 @@ class GridGenerator(object):
         gaps = G.distance * total_poloidal_distance[G.lcfs_index]
         for i,d in enumerate(gaps[1:]):
             v = array([G.R[0,G.lcfs_index] + 0.001*G.lcfs_drn[0], G.z[0,G.lcfs_index] + 0.001*G.lcfs_drn[1]])
-            x0 = self.eq.follow_surface(v, d, direction=G.trace_drn)
+            x0 = self.eq.follow_surface(v, d, direction=G.trace_drn, step_size = step_size)
 
             G.R[i+1,G.lcfs_index] = x0[0]
             G.z[i+1,G.lcfs_index] = x0[1]
@@ -243,7 +269,6 @@ class GridGenerator(object):
 
 
     def other_memes(self):
-
         """
         interpolate between the orthogonal / non-orthogonal grids
         """
