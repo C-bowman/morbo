@@ -1,5 +1,5 @@
 
-from numpy import array, zeros, concatenate, searchsorted, ndarray, ones, exp
+from numpy import array, zeros, concatenate, searchsorted, ndarray, ones, exp, diff
 from scipy.special import factorial
 from numpy.linalg import solve
 from mesh_tools.vessel_boundaries import tcv_baffled_boundary
@@ -234,38 +234,41 @@ class GridGenerator(object):
         """
         trace the grids using grad-psi
         """
-        total_poloidal_distance = zeros(len(G.psi))
-        for i in range(len(G.psi)):
-            if i != G.lcfs_index:
-                v = array([G.R[0,i], G.z[0,i]])
-                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
-                total_poloidal_distance[i] = distance
-            else:
-                v = array([G.R[0,i] + 0.001*G.lcfs_drn[0], G.z[0,i] + 0.001*G.lcfs_drn[1]])
-                x0, distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
-                total_poloidal_distance[i] = distance + 0.001
+        eps = 1e-3
 
-            G.R[-1,i] = x0[0]
-            G.z[-1,i] = x0[1]
+        # First find the total poloidal distance to the endpoint along the separatrix
+        v = array([G.R[0, G.lcfs_index] + eps*G.lcfs_drn[0], G.z[0, G.lcfs_index] + eps*G.lcfs_drn[1]])
+        x0, lcfs_distance = self.eq.follow_surface_while(v, G.condition, direction=G.trace_drn, step_size = step_size)
+        lcfs_distance += eps
+        G.R[-1,G.lcfs_index] = x0[0]
+        G.z[-1,G.lcfs_index] = x0[1]
 
-        # now trace all the points in the separatrix
-        gaps = G.distance * total_poloidal_distance[G.lcfs_index]
+        # Now trace out all the grid points along the separatrix
+        gaps = diff(G.distance*lcfs_distance)
+        x0 = self.eq.follow_surface(v, gaps[0]-eps, direction = G.trace_drn, step_size = step_size)
+        G.R[1, G.lcfs_index] = x0[0]
+        G.z[1, G.lcfs_index] = x0[1]
+
         for i,d in enumerate(gaps[1:]):
-            v = array([G.R[0,G.lcfs_index] + 0.001*G.lcfs_drn[0], G.z[0,G.lcfs_index] + 0.001*G.lcfs_drn[1]])
+            v = array([G.R[i+1,G.lcfs_index], G.z[i+1,G.lcfs_index]])
             x0 = self.eq.follow_surface(v, d, direction=G.trace_drn, step_size = step_size)
+            G.R[i+2,G.lcfs_index] = x0[0]
+            G.z[i+2,G.lcfs_index] = x0[1]
 
-            G.R[i+1,G.lcfs_index] = x0[0]
-            G.z[i+1,G.lcfs_index] = x0[1]
-
-        # now
-        for j in range(len(G.psi)):
-            gaps = G.distance * total_poloidal_distance[j]
-            for i,d in enumerate(gaps[1:]):
-                if j != G.lcfs_index:
-                    v = array([G.R[i+1,G.lcfs_index], G.z[i+1,G.lcfs_index]])
-                    x0 = self.eq.follow_gradient(v, G.psi[j])
-                    G.R[i+1,j] = x0[0]
-                    G.z[i+1,j] = x0[1]
+        # Now trace all the orthogonal directions
+        for i in range(1, len(G.distance)):
+            # trace out the lower flux side
+            for j in range(G.lcfs_index-1,-1,-1):
+                v = array([G.R[i,j+1], G.z[i,j+1]])
+                x0 = self.eq.follow_gradient(v, G.psi[j])
+                G.R[i,j] = x0[0]
+                G.z[i,j] = x0[1]
+            # trace out the higher flux side
+            for j in range(G.lcfs_index+1,len(G.psi)):
+                v = array([G.R[i,j-1], G.z[i,j-1]])
+                x0 = self.eq.follow_gradient(v, G.psi[j])
+                G.R[i,j] = x0[0]
+                G.z[i,j] = x0[1]
 
 
     def other_memes(self):
