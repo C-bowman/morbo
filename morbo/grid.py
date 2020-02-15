@@ -6,10 +6,16 @@ from mesh_tools.vessel_boundaries import tcv_baffled_boundary
 from copy import deepcopy
 import matplotlib.pyplot as plt
 
-def cross_fade(x, sigma = 0.05, k = 2.):
+def cross_fade(G1, G2, sigma=0.05, k=2.):
+    G3 = deepcopy(G1)
+    x = zeros(G1.R.shape)
+    for i in range(x.shape[1]):
+        x[:,i] = G1.distance
     z = abs((x-1)/sigma)
-    return exp(-0.5*z**k)
-
+    p = exp(-0.5*z**k)
+    G3.R = G1.R*(1-p) + p*G2.R
+    G3.z = G1.z*(1-p) + p*G2.z
+    return G3
 
 def get_fd_coeffs(points, order=1):
     # check validity of inputs
@@ -53,26 +59,12 @@ class GridGenerator(object):
         """
         now use these to build the flux axes for the legs / edges
         """
-        outer_leg_psi_axis = []
-        outer_leg_psi_axis.extend(pfr_flux_grid)
-        outer_leg_psi_axis.append(1.)
-        outer_leg_psi_axis.extend(outer_sol_flux_grid)
+        # TODO - parse inputs for validity
 
-        outer_edge_psi_axis = []
-        outer_edge_psi_axis.extend(core_flux_grid)
-        outer_edge_psi_axis.append(1.)
-        outer_edge_psi_axis.extend(outer_sol_flux_grid)
-
-        inner_edge_psi_axis = []
-        inner_edge_psi_axis.extend(core_flux_grid)
-        inner_edge_psi_axis.append(1.)
-        inner_edge_psi_axis.extend(inner_sol_flux_grid)
-
-        inner_leg_psi_axis = []
-        inner_leg_psi_axis.extend(pfr_flux_grid)
-        inner_leg_psi_axis.append(1.)
-        inner_leg_psi_axis.extend(inner_sol_flux_grid)
-
+        inner_leg_psi_axis = concatenate([pfr_flux_grid,inner_sol_flux_grid])
+        outer_leg_psi_axis = concatenate([pfr_flux_grid,outer_sol_flux_grid])
+        inner_edge_psi_axis = concatenate([core_flux_grid,inner_sol_flux_grid])
+        outer_edge_psi_axis = concatenate([core_flux_grid,outer_sol_flux_grid])
 
         """
         Build base grid objects
@@ -181,6 +173,13 @@ class GridGenerator(object):
         for G in self.orthogonal_grids:
             self.trace_orthogonal_grid(G, step_size = 5e-3)
 
+        self.inner_leg_grid = cross_fade(self.inner_leg_ortho_grid, self.inner_leg_dist_grid, sigma = 0.1)
+        self.outer_leg_grid = cross_fade(self.outer_leg_ortho_grid, self.outer_leg_dist_grid, sigma = 0.01)
+        self.inner_edge_grid = deepcopy(self.inner_edge_ortho_grid)
+        self.outer_edge_grid = deepcopy(self.outer_edge_ortho_grid)
+
+        self.grids = [self.inner_leg_grid, self.outer_leg_grid,
+                      self.inner_edge_grid, self.outer_edge_grid]
 
     def plot_grids(self):
         cols = ['red', 'blue', 'green', 'violet']
@@ -198,8 +197,12 @@ class GridGenerator(object):
         ax2.plot(*tcv_baffled_boundary(), c = 'black')
         ax2.axis('equal')
 
+        ax3 = fig.add_subplot(133)
+        for G,c in zip(self.grids, cols):
+            G.plot(color = c, ax = ax3)
+        ax3.plot(*tcv_baffled_boundary(), c = 'black')
+        ax3.axis('equal')
         plt.show()
-
 
     def trace_distance_grid(self, G, step_size = 1e-3):
         eps = 1e-3

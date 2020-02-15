@@ -16,13 +16,13 @@ psi = Equilibrium(R_psi, z_psi, psi_grid)
 """
 Specify the flux axes for the 4 separatrix-bounded regions
 """
-core_flux_grid = [v for v in linspace(0.91,1,7)[:-1]]
-pfr_flux_grid = [v for v in linspace(0.91,1,7)[:-1]]
+core_flux_grid = linspace(0.91,1,7)
+pfr_flux_grid =  linspace(0.91,1,7)
 
-outer_sol_flux_grid = [v for v in linspace(1,1.09,7)[1:]]
-inner_sol_flux_grid = [v for v in linspace(1,1.09,7)[1:]]
+outer_sol_flux_grid = linspace(1,1.09,7)[1:]
+inner_sol_flux_grid = linspace(1,1.09,7)[1:]
 
-outer_leg_distance_axis = linspace(0, 1, 32)
+outer_leg_distance_axis = linspace(0, 1, 16)
 inner_leg_distance_axis = linspace(0, 1, 7)
 
 outer_edge_distance_axis = linspace(0, 1, 40)
