@@ -216,3 +216,20 @@ class Equilibrium(object):
         plt.axis('equal')
         plt.show()
 
+    def plot_stationary_points(self):
+        R_mesh, z_mesh = meshgrid(linspace(self.R_min, self.R_max, 64), linspace(self.z_min, self.z_max, 128))
+
+        points = self.find_stationary_points()
+
+        aspect = (self.R_max-self.R_min)/(self.z_max-self.z_min)
+        plt.figure(figsize = (10.*aspect,10.))
+        psi_mesh = self.psi([R_mesh, z_mesh])
+        plt.contour(R_mesh, z_mesh, psi_mesh, 32)
+        for p in points:
+            plt.plot(*p, 'x', color = 'red')
+        plt.xlim([self.R_min,self.R_max])
+        plt.ylim([self.z_min,self.z_max])
+        plt.legend()
+        plt.axis('equal')
+        plt.show()
+

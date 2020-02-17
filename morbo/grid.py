@@ -2,9 +2,9 @@
 from numpy import array, zeros, concatenate, searchsorted, ndarray, ones, exp, diff
 from scipy.special import factorial
 from numpy.linalg import solve
-from mesh_tools.vessel_boundaries import tcv_baffled_boundary
 from copy import deepcopy
 import matplotlib.pyplot as plt
+from morbo.boundary import Boundary
 
 def cross_fade(G1, G2, sigma=0.05, k=2.):
     G3 = deepcopy(G1)
@@ -53,7 +53,7 @@ class Grid(object):
 class GridGenerator(object):
     def __init__(self, equilibrium = None, core_flux_grid = None, pfr_flux_grid = None, outer_sol_flux_grid = None,
                  inner_sol_flux_grid = None, inner_leg_distance_axis = None, outer_leg_distance_axis = None,
-                 inner_edge_distance_axis = None, outer_edge_distance_axis = None):
+                 inner_edge_distance_axis = None, outer_edge_distance_axis = None, machine = None):
 
         self.eq = equilibrium
         """
@@ -73,6 +73,8 @@ class GridGenerator(object):
         outer_leg = Grid(flux_axis = outer_leg_psi_axis, parallel_axis = outer_leg_distance_axis)
         inner_edge = Grid(flux_axis = inner_edge_psi_axis, parallel_axis = inner_edge_distance_axis)
         outer_edge = Grid(flux_axis = outer_edge_psi_axis, parallel_axis = outer_edge_distance_axis)
+
+        self.bound_poly = Boundary.load(machine)
 
 
         """
@@ -142,11 +144,8 @@ class GridGenerator(object):
             G2.z[0, :G2.lcfs_index] = boundary_z
 
 
-        from mesh_tools.mesh import Polygon
-        bound_poly = Polygon(*tcv_baffled_boundary())
-
-        inner_leg.condition = bound_poly.is_inside
-        outer_leg.condition = bound_poly.is_inside
+        inner_leg.condition = self.bound_poly.is_inside
+        outer_leg.condition = self.bound_poly.is_inside
         inner_edge.condition = lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]>=0.))
         outer_edge.condition = lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]<=0.))
 
@@ -188,19 +187,19 @@ class GridGenerator(object):
         ax1 = fig.add_subplot(131)
         for G,c in zip(self.distance_grids, cols):
             G.plot(color = c, ax = ax1)
-        ax1.plot(*tcv_baffled_boundary(), c = 'black')
+        ax1.plot(self.bound_poly.x, self.bound_poly.y, c = 'black')
         ax1.axis('equal')
 
         ax2 = fig.add_subplot(132)
         for G,c in zip(self.orthogonal_grids, cols):
             G.plot(color = c, ax = ax2)
-        ax2.plot(*tcv_baffled_boundary(), c = 'black')
+        ax2.plot(self.bound_poly.x, self.bound_poly.y, c = 'black')
         ax2.axis('equal')
 
         ax3 = fig.add_subplot(133)
         for G,c in zip(self.grids, cols):
             G.plot(color = c, ax = ax3)
-        ax3.plot(*tcv_baffled_boundary(), c = 'black')
+        ax3.plot(self.bound_poly.x, self.bound_poly.y, c = 'black')
         ax3.axis('equal')
         plt.show()
 
