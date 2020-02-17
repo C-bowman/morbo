@@ -131,7 +131,7 @@ class Equilibrium(object):
 
         return x0, travelled
 
-    def find_stationary_points(self, R_points = 3, z_points = 25):
+    def find_stationary_points(self, R_points = 5, z_points = 25):
         """
         Find all points inside the flux grid where the magnitude of the gradient is zero
         """
@@ -163,15 +163,32 @@ class Equilibrium(object):
             if not any([dist(p,s)<1e-4 for s in stationary_points]):
                 stationary_points.append(p)
 
+        self.maxima = []
+        self.minima = []
+        self.x_points = []
+
+        for p in stationary_points:
+            H = self.hessian(p)
+            if sign(H[0,0]) == sign(H[1,1]):
+                if sign(H[0,0]) > 0:
+                    self.minima.append(p)
+                else:
+                    self.maxima.append(p)
+            else:
+                self.x_points.append(p)
+
+        self.maxima = sorted(self.maxima, key = self.psi)
+        self.minima = sorted(self.minima, key = self.psi)
+        self.x_points = sorted(self.x_points, key = self.psi)
+
         return stationary_points
 
     def normalise_flux(self):
         # get all stationary points
         points = self.find_stationary_points()
-        # sort them by their flux value
-        points = sorted(points, key = self.psi)
         # assign the axis and x-point
-        self.magnetic_axis, self.x_point, *_ = points
+        self.magnetic_axis = self.minima[0]
+        self.x_point = self.x_points[0]
         # normalise the flux and re-build the spline
         self.psi_grid = (self.psi_grid - self.psi(self.magnetic_axis)) / (self.psi(self.x_point)-self.psi(self.magnetic_axis))
         self.psi_spline = RectBivariateSpline(self.R, self.z, self.psi_grid)
@@ -204,11 +221,11 @@ class Equilibrium(object):
         R_mesh, z_mesh = meshgrid(linspace(self.R_min, self.R_max, 64), linspace(self.z_min, self.z_max, 128))
 
         aspect = (self.R_max-self.R_min)/(self.z_max-self.z_min)
-        plt.figure(figsize = (10.*aspect,10.))
+        plt.figure(figsize = (8.*aspect,8.))
         psi_mesh = self.psi([R_mesh, z_mesh])
-        plt.contourf(R_mesh, z_mesh, psi_mesh, 32)
+        plt.contourf(R_mesh, z_mesh, psi_mesh, 64)
         plt.contour(R_mesh, z_mesh, psi_mesh, levels = [1.], colors = ['red'])
-        plt.plot(*self.magnetic_axis, 'x', color = 'dodgerblue', label = 'magnetic axis', markersize = 8)
+        plt.plot(*self.magnetic_axis, 'x', color = 'dodgerblue', label = 'magnetic axis', markersize = 10)
         # plt.plot(*self.x_point, 'x', color = 'red', label = 'X-point')
         plt.xlim([self.R_min,self.R_max])
         plt.ylim([self.z_min,self.z_max])
@@ -222,11 +239,15 @@ class Equilibrium(object):
         points = self.find_stationary_points()
 
         aspect = (self.R_max-self.R_min)/(self.z_max-self.z_min)
-        plt.figure(figsize = (10.*aspect,10.))
+        plt.figure(figsize = (8.*aspect,8.))
         psi_mesh = self.psi([R_mesh, z_mesh])
-        plt.contour(R_mesh, z_mesh, psi_mesh, 32)
-        for p in points:
-            plt.plot(*p, 'x', color = 'red')
+        plt.contour(R_mesh, z_mesh, psi_mesh, 64)
+        for p in self.x_points:
+            plt.plot(*p, 'x', color = 'red', markersize = 9, mew = 2)
+        for p in self.minima:
+            plt.plot(*p, 'o', color = 'dodgerblue', markersize = 8, markeredgecolor = 'black')
+        for p in self.maxima:
+            plt.plot(*p, 'o', color = 'orange', markersize = 8, markeredgecolor = 'black')
         plt.xlim([self.R_min,self.R_max])
         plt.ylim([self.z_min,self.z_max])
         plt.legend()

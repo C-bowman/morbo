@@ -6,15 +6,14 @@ D = load('./testing_data/tcv_equil_64523_1100ms.npz')
 R_psi = D['R']
 z_psi = D['z']
 psi_grid = D['psi']
-psi_shape = psi_grid.shape
 
-print(R_psi.shape, z_psi.shape, psi_grid.shape)
 
 from morbo.grid import GridGenerator
 from morbo.tracing import Equilibrium
 psi = Equilibrium(R_psi, z_psi, psi_grid)
 psi.plot_stationary_points()
-exit()
+
+
 """
 Specify the flux axes for the 4 separatrix-bounded regions
 """

@@ -1,28 +1,17 @@
 
-from numpy import load, linspace, meshgrid
+from numpy import load, linspace
 
 D = load('./testing_data/mastu_fiesta_equilibrium_5.npz')
 
 R_psi = D['R']
 z_psi = D['z']
 psi_grid = D['psi']
-psi_shape = psi_grid.shape
-print(R_psi.shape, z_psi.shape, psi_grid.shape)
 
 from morbo.grid import GridGenerator
 from morbo.tracing import Equilibrium
 
-import matplotlib.pyplot as plt
-
-R_mesh, z_mesh = meshgrid(R_psi, z_psi)
-
-
-plt.scatter(R_mesh, z_mesh, c = psi_grid, marker = '.')
-plt.axis('equal')
-plt.tight_layout()
-plt.show()
-
 psi = Equilibrium(R_psi, z_psi, psi_grid)
+psi.plot_equilibrium()
 psi.plot_stationary_points()
 exit()
 
