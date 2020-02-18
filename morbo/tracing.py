@@ -199,26 +199,40 @@ class Equilibrium(object):
         self.find_stationary_points()
         # assign the axis and x-point
         self.magnetic_axis = self.minima[0]
-        self.x_point = self.x_points[0]
+        self.primary_x_point = self.x_points[0]
         # normalise the flux and re-build the spline
-        self.psi_grid = (self.psi_grid - self.psi(self.magnetic_axis)) / (self.psi(self.x_point)-self.psi(self.magnetic_axis))
+        self.psi_grid = (self.psi_grid - self.psi(self.magnetic_axis)) / (self.psi(self.primary_x_point)-self.psi(self.magnetic_axis))
         self.psi_spline = RectBivariateSpline(self.R, self.z, self.psi_grid)
+        # check for a second x-point
+        if len(self.x_points)>1 and self.psi(self.x_points[1]) < 1.01:
+            self.lower_x_point, self.upper_x_point = sorted(self.x_points[:2], key = lambda x : x[1])
+        elif self.primary_x_point[1] < self.magnetic_axis[1]:
+            self.lower_x_point = self.x_points[0]
+        else:
+            self.upper_x_point = self.x_points[0]
 
-    def lcfs_directions(self):
+    def lcfs_directions(self, null = None):
         """
         Find the 4 unit vectors which point along the direction of the separatrix at the x-point
         """
+        if null is 'lower':
+            xpt = self.lower_x_point
+        elif null is 'upper':
+            xpt = self.upper_x_point
+        else:
+            xpt = self.primary_x_point
+
         # brute-force grid-search to find a direction pointing along the LCFS
         theta = linspace(0, 2*pi, 4*360)
         r = 0.01
-        lcfs_deviation = (1 - self.psi([self.x_point[0] + r*cos(theta), self.x_point[1] + r*sin(theta)])) ** 2
+        lcfs_deviation = (1 - self.psi([xpt[0] + r*cos(theta), xpt[1] + r*sin(theta)])) ** 2
         lcfs_angle = theta[lcfs_deviation.argmin()]
         # now get the other 3 LCFS directions
         cardinals = [0, 0.5*pi, pi, 1.5*pi]
         lcfs_directions = [array([cos(lcfs_angle + t), sin(lcfs_angle + t)]) for t in cardinals]
 
         # get the direction vector from the lower x-point to the axis
-        axis_drn = unit(array([self.magnetic_axis[0]-self.x_point[0], self.magnetic_axis[1]-self.x_point[1]]))
+        axis_drn = unit(array([self.magnetic_axis[0]-xpt[0], self.magnetic_axis[1]-xpt[1]]))
         # also get the outboard direction
         outboard_drn = array([1,0])
         # first sort by leg / edge region

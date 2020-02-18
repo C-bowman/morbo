@@ -53,7 +53,7 @@ class Grid(object):
 class GridGenerator(object):
     def __init__(self, equilibrium = None, core_flux_grid = None, pfr_flux_grid = None, outer_sol_flux_grid = None,
                  inner_sol_flux_grid = None, inner_leg_distance_axis = None, outer_leg_distance_axis = None,
-                 inner_edge_distance_axis = None, outer_edge_distance_axis = None, machine = None):
+                 inner_edge_distance_axis = None, outer_edge_distance_axis = None, machine = None, null = 'lower'):
 
         self.eq = equilibrium
         """
@@ -80,7 +80,7 @@ class GridGenerator(object):
         """
         Find the 4 directions pointing along the separatrix from the x-point
         """
-        lcfs_directions = self.eq.lcfs_directions()
+        lcfs_directions = self.eq.lcfs_directions(null = 'lower')
         il_drn, ie_drn, ol_drn, oe_drn = lcfs_directions
         inner_leg.lcfs_drn = il_drn
         outer_leg.lcfs_drn = ol_drn
@@ -101,7 +101,7 @@ class GridGenerator(object):
         # create starting points for tracing the grid boundaries
         gap = 0.01
         for g in grids:
-            start = self.eq.follow_gradient(self.eq.x_point + gap*g.lcfs_drn, target_psi=1.)
+            start = self.eq.follow_gradient(self.eq.lower_x_point + gap*g.lcfs_drn, target_psi=1.)
             # trace outer-leg boundary
             for i,p in enumerate(g.psi):
                 x = self.eq.follow_gradient(start, target_psi = p)
@@ -113,41 +113,41 @@ class GridGenerator(object):
         match grids at x-point
         """
         for g in grids:
-            g.R[0,g.lcfs_index] = self.eq.x_point[0]
-            g.z[0,g.lcfs_index] = self.eq.x_point[1]
+            g.R[0,g.lcfs_index] = self.eq.lower_x_point[0]
+            g.z[0,g.lcfs_index] = self.eq.lower_x_point[1]
 
 
         """
         match the leg-edge boundaries
         """
-        for G1, G2 in [(outer_leg, outer_edge), (inner_leg, inner_edge)]:
-            boundary_R = 0.5*(G1.R[0,G1.lcfs_index:] + G2.R[0,G2.lcfs_index:])
-            G1.R[0, G1.lcfs_index:] = boundary_R
-            G2.R[0, G2.lcfs_index:] = boundary_R
-
-            boundary_z = 0.5*(G1.z[0,G1.lcfs_index:] + G2.z[0,G2.lcfs_index:])
-            G1.z[0, G1.lcfs_index:] = boundary_z
-            G2.z[0, G2.lcfs_index:] = boundary_z
+        # for G1, G2 in [(outer_leg, outer_edge), (inner_leg, inner_edge)]:
+        #     boundary_R = 0.5*(G1.R[0,G1.lcfs_index:] + G2.R[0,G2.lcfs_index:])
+        #     G1.R[0, G1.lcfs_index:] = boundary_R
+        #     G2.R[0, G2.lcfs_index:] = boundary_R
+        #
+        #     boundary_z = 0.5*(G1.z[0,G1.lcfs_index:] + G2.z[0,G2.lcfs_index:])
+        #     G1.z[0, G1.lcfs_index:] = boundary_z
+        #     G2.z[0, G2.lcfs_index:] = boundary_z
 
 
 
         """
         match the leg-leg and edge-edge boundaries
         """
-        for G1, G2 in [(inner_leg, outer_leg), (inner_edge, outer_edge)]:
-            boundary_R = 0.5*(G1.R[0,:G1.lcfs_index] + G2.R[0,:G2.lcfs_index])
-            G1.R[0, :G1.lcfs_index] = boundary_R
-            G2.R[0, :G2.lcfs_index] = boundary_R
-
-            boundary_z = 0.5*(G1.z[0,:G1.lcfs_index] + G2.z[0,:G2.lcfs_index])
-            G1.z[0, :G1.lcfs_index] = boundary_z
-            G2.z[0, :G2.lcfs_index] = boundary_z
+        # for G1, G2 in [(inner_leg, outer_leg), (inner_edge, outer_edge)]:
+        #     boundary_R = 0.5*(G1.R[0,:G1.lcfs_index] + G2.R[0,:G2.lcfs_index])
+        #     G1.R[0, :G1.lcfs_index] = boundary_R
+        #     G2.R[0, :G2.lcfs_index] = boundary_R
+        #
+        #     boundary_z = 0.5*(G1.z[0,:G1.lcfs_index] + G2.z[0,:G2.lcfs_index])
+        #     G1.z[0, :G1.lcfs_index] = boundary_z
+        #     G2.z[0, :G2.lcfs_index] = boundary_z
 
 
         inner_leg.condition = self.bound_poly.is_inside
         outer_leg.condition = self.bound_poly.is_inside
-        inner_edge.condition = self.bound_poly.is_inside# lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]>=0.))
-        outer_edge.condition = self.bound_poly.is_inside# lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]<=0.))
+        inner_edge.condition = lambda x : x[1] < 0.# lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]>=0.))
+        outer_edge.condition = lambda x : x[1] < 0.# lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]<=0.))
 
 
 
@@ -173,7 +173,7 @@ class GridGenerator(object):
             self.trace_orthogonal_grid(G, step_size = 5e-3)
 
         self.inner_leg_grid = cross_fade(self.inner_leg_ortho_grid, self.inner_leg_dist_grid, sigma = 0.1)
-        self.outer_leg_grid = cross_fade(self.outer_leg_ortho_grid, self.outer_leg_dist_grid, sigma = 0.01)
+        self.outer_leg_grid = cross_fade(self.outer_leg_ortho_grid, self.outer_leg_dist_grid, sigma = 0.1, k = 2.)
         self.inner_edge_grid = deepcopy(self.inner_edge_ortho_grid)
         self.outer_edge_grid = deepcopy(self.outer_edge_ortho_grid)
 
@@ -239,7 +239,7 @@ class GridGenerator(object):
         """
         trace the grids using grad-psi
         """
-        eps = 1e-3
+        eps = 5e-3
 
         # First find the total poloidal distance to the endpoint along the separatrix
         v = array([G.R[0, G.lcfs_index] + eps*G.lcfs_drn[0], G.z[0, G.lcfs_index] + eps*G.lcfs_drn[1]])

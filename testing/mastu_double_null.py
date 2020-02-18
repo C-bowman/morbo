@@ -18,22 +18,20 @@ psi.plot_stationary_points()
 
 
 
-
-
 """
 Specify the flux axes for the 4 separatrix-bounded regions
 """
-core_flux_grid = linspace(0.97,1,7)
-pfr_flux_grid =  linspace(0.97,1,7)
+core_flux_grid = linspace(0.96,1,5)
+pfr_flux_grid =  linspace(0.95,1,6)
 
-outer_sol_flux_grid = linspace(1,1.03,7)[1:]
-inner_sol_flux_grid = linspace(1,1.03,7)[1:]
+outer_sol_flux_grid = linspace(1,1.15,16)[1:]
+inner_sol_flux_grid = linspace(1,1.03,4)[1:]
 
-outer_leg_distance_axis = linspace(0, 1, 16)
-inner_leg_distance_axis = linspace(0, 1, 7)
+outer_leg_distance_axis = linspace(0, 1, 30)
+inner_leg_distance_axis = linspace(0, 1, 6)
 
-outer_edge_distance_axis = linspace(0, 1, 40)
-inner_edge_distance_axis = linspace(0, 1, 30)
+outer_edge_distance_axis = linspace(0, 1, 10)
+inner_edge_distance_axis = linspace(0, 1, 10)
 
 
 
