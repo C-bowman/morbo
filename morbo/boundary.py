@@ -53,7 +53,7 @@ class Boundary(object):
     @classmethod
     def load(cls, machine):
         machine_boundaries = {
-            'mast_u' : mastu_boundary,
+            'mast-u' : mastu_boundary,
             'tcv' : tcv_baffled_boundary,
             'jet' : jet_boundary_detailed
         }

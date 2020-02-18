@@ -3,7 +3,7 @@ from numpy import array, dot, sqrt, sign, linspace, meshgrid, pi, sin, cos
 from scipy.interpolate import RectBivariateSpline
 from itertools import product
 import matplotlib.pyplot as plt
-
+from morbo.boundary import Boundary
 
 def dist(a,b):
     c = a - b
@@ -18,7 +18,7 @@ def unit(a):
 
 
 class Equilibrium(object):
-    def __init__(self, R, z, psi):
+    def __init__(self, R, z, psi, machine = None):
         self.R = R
         self.z = z
         self.psi_grid = psi
@@ -28,6 +28,12 @@ class Equilibrium(object):
         self.R_min = R.min()
         self.z_max = z.max()
         self.z_min = z.min()
+
+        if machine is not None:
+            self.Boundary = Boundary.load(machine)
+            # self.Boundary.diagnostic_plot()
+        else:
+            self.Boundary = None
 
         self.normalise_flux()
 
@@ -181,11 +187,16 @@ class Equilibrium(object):
         self.minima = sorted(self.minima, key = self.psi)
         self.x_points = sorted(self.x_points, key = self.psi)
 
+        if self.Boundary is not None:
+            self.maxima = [p for p in self.maxima if self.Boundary.is_inside(p)]
+            self.minima = [p for p in self.minima if self.Boundary.is_inside(p)]
+            self.x_points = [p for p in self.x_points if self.Boundary.is_inside(p)]
+
         return stationary_points
 
     def normalise_flux(self):
         # get all stationary points
-        points = self.find_stationary_points()
+        self.find_stationary_points()
         # assign the axis and x-point
         self.magnetic_axis = self.minima[0]
         self.x_point = self.x_points[0]
@@ -217,16 +228,20 @@ class Equilibrium(object):
         # this means the order should be inner leg, inner edge, outer leg, outer edge
         return lcfs_directions
 
-    def plot_equilibrium(self):
+    def plot_equilibrium(self, flux_range = (0,1.5)):
         R_mesh, z_mesh = meshgrid(linspace(self.R_min, self.R_max, 64), linspace(self.z_min, self.z_max, 128))
 
         aspect = (self.R_max-self.R_min)/(self.z_max-self.z_min)
         plt.figure(figsize = (8.*aspect,8.))
         psi_mesh = self.psi([R_mesh, z_mesh])
-        plt.contourf(R_mesh, z_mesh, psi_mesh, 64)
+        plt.contour(R_mesh, z_mesh, psi_mesh, levels = linspace(*flux_range,24))
         plt.contour(R_mesh, z_mesh, psi_mesh, levels = [1.], colors = ['red'])
-        plt.plot(*self.magnetic_axis, 'x', color = 'dodgerblue', label = 'magnetic axis', markersize = 10)
+        # plt.plot(*self.magnetic_axis, 'x', color = 'dodgerblue', label = 'magnetic axis', markersize = 10)
         # plt.plot(*self.x_point, 'x', color = 'red', label = 'X-point')
+
+        if self.Boundary is not None:
+            plt.plot(self.Boundary.x, self.Boundary.y, lw = 4, c = 'white')
+            plt.plot(self.Boundary.x, self.Boundary.y, lw = 2, c = 'black')
         plt.xlim([self.R_min,self.R_max])
         plt.ylim([self.z_min,self.z_max])
         plt.legend()

@@ -146,8 +146,8 @@ class GridGenerator(object):
 
         inner_leg.condition = self.bound_poly.is_inside
         outer_leg.condition = self.bound_poly.is_inside
-        inner_edge.condition = lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]>=0.))
-        outer_edge.condition = lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]<=0.))
+        inner_edge.condition = self.bound_poly.is_inside# lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]>=0.))
+        outer_edge.condition = self.bound_poly.is_inside# lambda x : ~((x[1]>self.eq.magnetic_axis[1]) and (self.eq.grad(x)[0]<=0.))
 
 
 
