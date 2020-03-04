@@ -29,13 +29,13 @@ def parallel_derivative(grid, order = 2):
 
             d01 = sqrt((p0[0]-p1[0])**2 + (p0[1]-p1[1])**2)
             d12 = sqrt((p2[0]-p1[0])**2 + (p2[1]-p1[1])**2)
-            pol_dist = array([0., d01, d12])
+            pol_dist = array([0., d01, d01+d12])
             coeffs = get_fd_coeffs(pol_dist, order=order)
 
             info[p1] = {p0 : coeffs[0],
                         p1 : coeffs[1],
                         p2 : coeffs[2]}
-            return info
+    return info
 
 
 def perpendicular_derivative(grid, order = 2, use_flux = True):
@@ -47,17 +47,14 @@ def perpendicular_derivative(grid, order = 2, use_flux = True):
             p2 = (grid.R[i,j+1], grid.z[i,j+1])
 
             if use_flux:
-                dist = grid.psi[j-1:j+1]
-                print(dist)
+                dist = grid.psi[j-1:j+2]
             else:
                 d01 = sqrt((p0[0]-p1[0])**2 + (p0[1]-p1[1])**2)
                 d12 = sqrt((p2[0]-p1[0])**2 + (p2[1]-p1[1])**2)
-                dist = array([0., d01, d12])
-
+                dist = array([0., d01, d01+d12])
 
             coeffs = get_fd_coeffs(dist, order=order)
-
             info[p1] = {p0 : coeffs[0],
                         p1 : coeffs[1],
                         p2 : coeffs[2]}
-            return info
+    return info
