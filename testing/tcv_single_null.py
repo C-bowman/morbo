@@ -9,7 +9,7 @@ psi_grid = D['psi']
 
 
 from morbo.grid import GridGenerator
-from morbo.tracing import Equilibrium
+from morbo.equilibrium import Equilibrium
 psi = Equilibrium(R_psi, z_psi, psi_grid)
 psi.plot_stationary_points()
 
