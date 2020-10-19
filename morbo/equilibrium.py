@@ -283,3 +283,18 @@ class Equilibrium(object):
         plt.axis('equal')
         plt.show()
 
+    def get_separatrix(self, resolution_multiplier = None):
+        if resolution_multiplier is None:
+            R_mesh, z_mesh = meshgrid(self.R, self.z)
+        else:
+            R_size = int(resolution_multiplier*self.R.size)
+            z_size = int(resolution_multiplier*self.z.size)
+            R_mesh, z_mesh = meshgrid(linspace(self.R_min, self.R_max, R_size), linspace(self.z_min, self.z_max, z_size))
+
+        psi_mesh = self.psi([R_mesh, z_mesh])
+        cs = plt.contour(R_mesh, z_mesh, psi_mesh, levels = [1.])
+        p = cs.collections[0].get_paths()[0]
+        plt.close()
+
+        v = p.vertices
+        return v[:,0], v[:,1]
